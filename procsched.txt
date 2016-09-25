@@ -1,0 +1,4 @@
+1 ping 127.0.0.1 -c 10
+5 ping 127.0.0.1 -c 30
+1 echo hola
+2 echo hola
