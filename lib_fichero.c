@@ -2,25 +2,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include "fragmenta.h"
+#include "lib_fichero.h"
 
 #define TRUE 1
 #define FALSE 0
 
-struct proceso{ //definimos la estructura de datos a utilizar.
-	int tiempo;
-	int pid;
-	char ** arg;
-};
-
-typedef struct proceso process; //definimos el tipo (para ahorrarnos tiempo)
-// typedef process ** arrayProcess;
-typedef process ** proc_cola;
-
-static void guardar_en_estruc(process * procStr,char ** str);
-static char * extraer_de_fichero(char * nombre,int * lin);
-void * carga_de_fichero(char * nombre,int code);
-static process ** carga_de_fichero_m1(char * nombre);
-static char *** carga_de_fichero_m2(char * nombre);
+static void save_into_struct(process* procStr,char** str);
+static char* extract_from_file(const char* filename,int* lin);
 
 /*
 Esta funcion cogera los datos del fichero de configuracion
@@ -53,174 +41,87 @@ Esta funcion tiene varias partes:
 
 */
 
-void * carga_de_fichero(char * nombre,int code)
-{
-	process ** proc;
-	char *** str;
-
-	switch(code)
-	{
-		case 1:
-		{
-			proc = carga_de_fichero_m1(nombre);
-			return proc;
-		}
-		break;
-		case 2:
-		{
-			str = carga_de_fichero_m2(nombre);
-			return str;
-		}
-		break;
-		default:
-			return NULL;
-	}
-}
 
 /*
 Esta funcion para la constante 1
 */
 
-process ** carga_de_fichero_m1(char * nombre)
+process** load_from_file(const char* filename)
 {
-	char * aux=NULL, *str=NULL;
-	char ** strM=NULL;
-	process ** proc=NULL;
-	int k,i=0,j;
-	int lineas,x;
+	char* aux = NULL;
+	char* str = NULL;
+	char** strM = NULL;
+	process ** proc = NULL;
+	int i = 0,j;
+	int lines;
 	
-	aux = extraer_de_fichero(nombre,&lineas);
-	
-	proc = realloc(proc,sizeof(process *)*(lineas+1));
+	aux = extract_from_file(filename, &lines);
 
-	if(proc==NULL)
+	if (aux == NULL) {
 		return NULL;
-	j=0;
-	k=1;
-	x=0;
-	while(aux[i]!='\0')
-	{		
-		if(aux[i]=='\n')
-		{
+	}
+
+	proc = realloc(proc, sizeof(process *)*(lines+1));
+
+	if(proc == NULL) {
+		return NULL;
+	}
+
+	j = 0;
+	while (aux[i] != '\0') {		
+		if (aux[i] == '\n') {
 			proc[j] = malloc(sizeof(process));
 
-			if(proc[j]==NULL)
+			if (proc[j] == NULL) {
 				return NULL;
+			}
 
 			str = malloc(sizeof(char)*(i+1));
-			strncpy(str,aux,i);
-			str[i]='\0';
+			strncpy(str, aux, i);
+			str[i] = '\0';
 			
-			strM = fragmenta(str);
+			strM = str_tokenizer(str);
 			proc[j]->arg = malloc(sizeof(char *));
 
-			guardar_en_estruc(proc[j],strM);
+			save_into_struct(proc[j], strM);
 
 			free(str);
 
-			aux=aux+i+1;
-			i=0;j++;
-		}
-		else
+			aux += i + 1;
+			i = 0;
+			j++;
+		} else {
 			i++;
+		}
 	}
 	
-	proc[lineas]=NULL;
+	proc[lines] = NULL;
 
 	return proc;
 }
 
-/*
-Esta funcion para la constante 2
-*/
-
-char *** carga_de_fichero_m2(char * nombre)
+int num_tasks(const proc_queue proc)
 {
+	int i = 0;
+	process** aux = (process**)proc;
 
-	char * aux=NULL, *str=NULL;
-	char ** strM=NULL;
-	char *** res=NULL;
-	int k,i=0,j;
-	int lineas,x;
-	
-	aux = extraer_de_fichero(nombre,&lineas);
-	
-	res = realloc(res,sizeof(char **)*(lineas+1));
-
-	if(res==NULL)
-		return NULL;
-	j=0;
-	k=1;
-	x=0;
-
-	while(aux[i]!='\0')
-	{		
-		if(aux[i]=='\n')
-		{
-			res[j] = malloc(sizeof(char **));
-
-			if(res[j]==NULL)
-				return NULL;
-
-			str = malloc(sizeof(char)*(i+1));
-			strncpy(str,aux,i);
-			str[i]='\0';
-			
-			strM = fragmenta(str);
-			res[j] = strM;
-
-			free(str);
-
-			aux=aux+i+1;
-			i=0;j++;
-		}
-		else
-			i++;
-	}
-	
-	res[lineas]=NULL;
-
-	return res;
-}
-
-char * guarda_en_fichero(char * str)
-{
-	FILE * f;
-	char buf[2000];
-	char * nombre="procsched.txt";
-
-	f = fopen(nombre,"w");
-
-	if(!f)
-	{
-		printf("Error. No se ha podido crear el archivo.\n\n");
-		exit(0);
-	}
-
-	printf("> ");
-	while(fgets(buf,2000,stdin)!=NULL)
-	{
-		fprintf(f,buf);
-		printf("> ");
-	}
-
-	fclose(f);
-
-	printf("\n");
-
-	return nombre;
-}
-
-int num_tareas(process ** proc)
-{
-	int i=0;
-	
-	while(proc[i]!=NULL)
+	while (aux[i] != NULL) {
 		i++;
-
+	}
 	return i;
-
 }
+
+void free_processes(proc_queue proc)
+{
+	int i = 0;
+	process** aux = (process**)proc;
+
+	for (i = 0; aux[i] != NULL; i++) {
+		free(aux[i]);
+	}
+	free(aux);
+}
+
 /* 
   DECLARACION:  
 
@@ -237,24 +138,24 @@ int num_tareas(process ** proc)
  esta funcion no retorna nada. Solo el parametro de salida.
 */
 
-void guardar_en_estruc(process * procStr,char ** str)
+void save_into_struct(process* procStr,char** str)
 {
-	int t,j,i=0;
-	
-	sscanf(str[0],"%d",&t);
-	procStr->tiempo=t;
+	int t,j,i = 0;
+
+	sscanf(str[0], "%d", &t);
+	procStr->time = t;
 	str++;
-	while(str[i]!=NULL)
-	{
-		j=i+1;
-		procStr->arg = realloc(procStr->arg,sizeof(char *)*j);
+
+	while (str[i] != NULL) {
+		j = i + 1;
+		procStr->arg = realloc(procStr->arg, sizeof(char *)*j);
 		procStr->arg[i] = malloc(sizeof(char)*strlen(str[i]));
-		strcpy(procStr->arg[i],str[i]);
+		strcpy(procStr->arg[i], str[i]);
 		i++;
 	}
-	j=i+1;
-	procStr->arg = realloc(procStr->arg,sizeof(char *)*j);
-	procStr->arg[i]=NULL;
+	j = i + 1;
+	procStr->arg = realloc(procStr->arg, sizeof(char *)*j);
+	procStr->arg[i] = NULL;
 }
 
 /* 
@@ -274,37 +175,49 @@ void guardar_en_estruc(process * procStr,char ** str)
   esta funcion devuelve un string con el contenido del fichero.
 */
 
-char * extraer_de_fichero(char * nombre,int * lin)
+char* extract_from_file(const char* filename,int* lin)
 {
-	FILE * f;
-	int lSize,i=0,result,c=0;
-	char * aux;
+	FILE* f = NULL;
+	int lSize, i = 0, c = 0;
+	char* aux = NULL;
 	
-	f = fopen(nombre,"r");
+	f = fopen(filename, "r");
 
-	if(f==NULL)
+	if (f == NULL)
 	{
-		printf("Error. Archivo %s no encontrado o protegido contra lectura/escritura\n\n",nombre);
-		exit(0);
+		printf("Error. File not found.\n\n");
+		exit(-1);
 	}
 
-	fseek(f,0,SEEK_END); //buscamos el final del archivo.
-	lSize=ftell(f); //obtenemos el tamaño del archivo.
-	rewind(f); //rebobinamos el fichero
+	fseek(f, 0, SEEK_END);
+	lSize = ftell(f);
+	rewind(f);
 	
-	aux = malloc(sizeof(char)*(lSize+1)); //reservamos una variable con el tamaño del fichero.
-	result = fread (aux,1,lSize,f); // leemos del fichero desde el inicio hasta el final (almacenando los datos).
-	aux[lSize]='\0';
+	aux = malloc(sizeof(char)*(lSize+1));
 
-	while(aux[i]!='\0') //con este bucle calculamos las lineas que tiene el fichero.
-	{
-		if(aux[i]=='\n')
+	if (aux == NULL) {
+		printf("Error. No memory available\n");
+		return NULL;
+	}
+
+	fread(aux, 1, lSize, f);
+	
+	if (lSize < 0) {
+		printf("Error. There was an error while trying to read file\n");
+		return NULL;
+	}
+	aux[lSize] = '\0';
+
+	while (aux[i] != '\0') {
+		if (aux[i] == '\n') {
 			c++;
+		}
 		i++;
 	}
+
 	fclose(f);
 
 	*lin = c;
-	
+
 	return aux;
 }

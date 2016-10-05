@@ -1,9 +1,8 @@
 #ifndef _FRAGMENTA_H_
 #define _FRAGMENTA_H_
 
-char ** fragmenta(const char * cadena);
-
-void borrarg(char ** cadena);
+char** str_tokenizer(char * str);
+void free_tokens(char** strings);
 
 #endif /*_FRAGMENTA_H_*/
 

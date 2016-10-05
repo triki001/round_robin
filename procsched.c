@@ -14,17 +14,16 @@
 #define TRUE 1
 #define FALSE 0
 
-void iniciar_pid_array(int * arr,int lng);
-void actualizar_cola(proc_cola pc,int * a,int n);
-void hijo_terminado(int signal, siginfo_t * info, void * data); //funcion a realizar cuando se capture la señal.
+void init_pid_array(int* pidList,int size);
+void update_queue(proc_queue pc,const int* pidList,int numProcesses);
+void child_finish_cb(int signal, siginfo_t* info, void* data);
 
-int main(int argc,char ** argv)
+int main(int argc,char** argv)
 {
-	process * aux;
-	proc_cola proc;
-	char * nom;
+	process* aux = NULL;
+	proc_queue proc = NULL;
 	int i,j;
-	int * pid_array=NULL;
+	int* pid_array=NULL;
 	int status;
 	char buf[2];
 	int fd;
@@ -40,49 +39,41 @@ int main(int argc,char ** argv)
 		sea recibida al terminar el proceso hijo.
 	*/
 	
-	act.sa_sigaction = hijo_terminado;
+	act.sa_sigaction = child_finish_cb;
 	act.sa_flags=SA_NOCLDSTOP | SA_SIGINFO;
 
 	printf("\n");
 	printf("\t\t\t\t******************************************************\n");
-	printf("\t\t\t\t*		PLANIFICADOR DE TAREAS               *\n");
+	printf("\t\t\t\t*           ROUND ROBIN PROCESS SCHEDULER            *\n");
 	printf("\t\t\t\t*		Version 0.1			     *\n");
 	printf("\t\t\t\t******************************************************\n");
 	printf("\n\n");
 	
-	if(argc < 2)
-	{
-		printf("Fichero no detectado. Introduce por teclado\n");
-		printf("Ctrl + D para parar\n");
-		nom = guarda_en_fichero();
-		proc = carga_de_fichero(nom,LIPRST);
-	}
-	else
-	{
-		printf("Fichero detectado. Nombre: %s\n",argv[1]);
-		proc = carga_de_fichero(argv[1],LIPRST);
-	}
-	if(!proc)
-	{
-		printf("Error. Las tareas no se han cargado correctamente\n");
-		exit(0);
+	if (argc != 2) {
+		printf("Error. Unable to find the process file. Abort.\n");
+		exit(-1);
+	} else {
+		printf("> Loading file: %s\n",argv[1]);
+		proc = load_from_file(argv[1]);
 	}
 
-	
-	pid_array = malloc(sizeof(int)*num_tareas(proc));
+	if (!proc) {
+		printf("Error. Unable to load the tasks defined in file\n");
+		exit(-2);
+	}
 
-	iniciar_pid_array(pid_array,num_tareas(proc));
+	pid_array = malloc(sizeof(int)*num_tasks(proc));
+
+	init_pid_array(pid_array,num_tasks(proc));
 	
-	for(i=0;i<num_tareas(proc);i++) //lanzamos uno a uno todos los hijos y mientras es el padre el q los controla
-	{
-		aux = sacar(proc); //sacamos la tarea.
-		avanzar(proc); //avanzamos la cola.
-		encolar(proc,aux); //encolamos la tarea
+	for(i = 0; i < num_tasks(proc); i++) {
+		aux = next(proc); //sacamos la tarea.
+		move(proc); //avanzamos la cola.
+		queue(proc,aux); //encolamos la tarea
 		/*De esta forma podremos iniciar la tarea y pararla. Una tarea para cada hijo.*/
 		pid_array[i] = fork();
 		
-		if(pid_array[i]==0) //proceso hijo.
-		{
+		if(pid_array[i]==0) {
 			signal(SIGSTOP,SIG_DFL); //programamos al hijo para que capture las señales de parada y continuar.
 			signal(SIGCONT,SIG_DFL);
 		  	raise(SIGSTOP); //hacemos dormir a todos los hijos hasta que todos estén cargados.
@@ -95,69 +86,61 @@ int main(int argc,char ** argv)
 			exit(0); //esta funcion, termina el proceso y envia una señal al padre (SIGCHLD) para decirle q ha terminado
 		}
 	}
-	i = num_tareas(proc);
+	i = num_tasks(proc);
 	printf("\n%d Tareas cargadas :: %d Procesos lanzados \n",i,i);
 	printf("Para continuar, pulse una tecla\n");
 	getchar();
 	
-	actualizar_cola(proc,pid_array,num_tareas(proc));
-	printf("\t\t\t\t EJECUCION \n");
+	update_queue(proc, pid_array, num_tasks(proc));
 	printf("*************************************************************************************\n");
-	printf("* P = Pendientes *** PID = Process ID *** T = Tiempo *** E = Estado *** C = Comando *\n");
+	printf("* P = Pending *** PID = Process ID *** T = Time *** S = Status *** C = Command      *\n");
 	printf("*************************************************************************************\n");
 	printf("\n");
-	j=0;
-	while(!is_null(proc))
-	{
+	j = 0;
+	while (!is_null(proc)) {
 		sigaction(SIGCHLD,&act,NULL); // preparamos al padre para capturar la señal y le decimos que accion debera realizar
 					      // cuando capture la señal. En este caso, la señal SIGCHLD (se envia cuando el hijo para o termina.
-		aux = sacar(proc); //sacamos de la pila.
-		avanzar(proc); //avanzamos la pila.
+		aux = next(proc); //sacamos de la pila.
+		move(proc); //avanzamos la pila.
 
 		kill(aux->pid,SIGCONT); //enviamos la señal de continuar al hijo.
-		printf("P: %d :: PID: %d :: T: %d sg :: E: Ejecutando :: C: %s %s \n",i,aux->pid,aux->tiempo,aux->arg[0],aux->arg[1]);
+		printf("P: %d :: PID: %d :: T: %d sg :: S: Executing :: C: %s %s \n",i,aux->pid,aux->time,aux->arg[0],aux->arg[1]);
 		
-		sleep(aux->tiempo); //dormimos al padre tantos segundos como los leidos por el fichero.
+		sleep(aux->time); //dormimos al padre tantos segundos como los leidos por el fichero.
 
 		kill(aux->pid,SIGSTOP); //enviamos la señal de parar al hijo.
-		printf("P: %d :: PID: %d :: T: %d sg :: E: Parado :: C: %s %s \n\n",i,aux->pid,aux->tiempo,aux->arg[0],aux->arg[1]);
+		printf("P: %d :: PID: %d :: T: %d sg :: E: Stopped :: C: %s %s \n\n",i,aux->pid,aux->time,aux->arg[0],aux->arg[1]);
 		
 		waitpid(aux->pid,&status,WUNTRACED | WCONTINUED); // ahora hacemos que el padre espere a que terminen los hijos.
 								  // o bien, si los hijos no han terminado, que continue.
-		if(WIFEXITED(status)) //Si status cumple la condicion de que el proceso haya terminado correctamente entonces entra.
-		{
-			printf("Proceso %d termino correctamente\n\n",aux->pid);
+		if (WIFEXITED(status)) {
+			printf("Process %d finished successfully.\n\n",aux->pid);
 			i--;
-			pid_array[j]=0;
-		}
-		else
-		{
-			encolar(proc,aux);
+			pid_array[j] = 0;
+		} else {
+			queue(proc,aux);
  		}
 		j++;
 	}
-	printf("\n0 tareas pendientes. Fin del programa\n\n");
+	printf("\nNo more pending processes. Finish.\n\n");
 	free(pid_array);
+	free_processes(proc);
 
 	return 0;
 	
 }
 
-void iniciar_pid_array(int * arr,int lng)
+void init_pid_array(int* pidList,int size)
+{
+	memset(pidList, 0, sizeof(int)*size);
+}
+
+void update_queue(proc_queue pc,const int* pids,int numProcesses)
 {
 	int i;
 
-	for(i=0;i<lng;i++)
-		arr[i]=0;
-}
-
-void actualizar_cola(proc_cola pc,int * a,int n)
-{
-	int i=0;
-
-	for(i=0;i<n;i++)
-	{
-		pc[i]->pid = a[i];
+	for(i = 0; i < numProcesses; i++) {
+		pc[i]->pid = pids[i];
 	}
 }
 
@@ -168,7 +151,7 @@ pues esta dormido. de esta forma, nos aseguramos que si un proceso tiene un
 tiempo de 10 segundos, pero termina en el segundo 2, el padre no se quede dormido
 los 8 segundos restantes.
 */
-void hijo_terminado(int signal, siginfo_t * info, void * data)
+void child_finish_cb(int signal, siginfo_t* info, void* data)
 {
 	raise(SIGCONT); //enviamos la señal al padre.
 }

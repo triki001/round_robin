@@ -6,41 +6,41 @@
 #define TRUE 1
 #define FALSE 0
 
-void encolar(proc_cola proc,process * elem)
+void queue(proc_queue proc, process* elem)
 {
 	int i=0;
 
-	while(proc[i]!=NULL)
+	while(proc[i]!=NULL) {
 		i++;
-	proc[i]=elem;
+	}
 
+	proc[i]=elem;
 }
 
-void avanzar(proc_cola proc)
+void move(proc_queue proc)
 {
 	int i=0,j=1;
 
-	while(proc[i]!=NULL)
-	{
-		proc[i]=proc[j];
+	while(proc[i] != NULL) {
+		proc[i] = proc[j];
 		i++;
 		j++;
 	}
-	proc[i-1]=NULL;
+	proc[i-1] = NULL;
 }
 
-process * sacar(proc_cola proc)
+process* next(proc_queue proc)
 {
-	process * aux=NULL;
+	process* aux=NULL;
 	aux = proc[0];
 
 	return aux;
 }
 
-int is_null(proc_cola proc)
+int is_null(proc_queue proc)
 {
-	if(proc[0]==NULL)
+	if(proc[0] == NULL) {
 		return TRUE;
-	else
-		return FALSE;
+	}
+	return FALSE;
 }

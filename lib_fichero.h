@@ -15,18 +15,18 @@
 
 */
 
-struct proceso{ //definimos la estructura de datos a utilizar.
-	int tiempo;
+struct process_ {
+	int time;
 	int pid;
-	char ** arg;
+	char** arg;
 };
 
-typedef struct proceso process;
-typedef process ** proc_cola;
+typedef struct process_ process;
+typedef process** proc_queue;
 
 
-void * carga_de_fichero(char * nombre,int code);
-int num_tareas(process ** proc);
-char * guarda_en_fichero();
-
+process** load_from_file(const char* filename);
+int num_tasks(const proc_queue proc);
+char* save_to_file();
+void free_processes(proc_queue proc);
 #endif /*_LIB_FICHERO_H_*/

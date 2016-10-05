@@ -7,109 +7,159 @@
 #define TRUE 1
 #define FALSE 0
 
-int buscar_inicio_cad(const char * str);
+#define FAIL 0
+#define SUCCESS 1
 
-char ** fragmenta(const char * cadena)
+#define WHITESPACE_CHAR " "
+#define EOS_CHAR '\0'
+
+static int find_first_char(const char* str);
+static void print_tokens(char** tokens);
+static int save_token(char** tokens, const char* token, int position);
+/*
+ * Function to split a string separated by spaces into free_tokens
+ */
+/*char** str_tokenizer(const char* str)
 {
-	char * aux;
-	char ** arg=NULL;
-	int i=0,j=0,n,k=0,z,a=1,l=1;
-	int pos=0;
+	char* aux = NULL;
+	char** arg = NULL;
+	int i = 0,j = 0,n,k = 0,z,a = 1,l = 1;
+	int pos = 0;
 
-	aux = cadena; // ya que cadena es de tipo const, necesitamos
-		      // necesitamos operar con otra variable auxiliar
-                      // para mover el puntero sin crear conflictos.
+	aux = (char *)malloc(sizeof(char)*strlen(str));
+	strncpy(aux, str, strlen(str));
 
-	pos = buscar_inicio_cad(cadena);
+	pos = find_first_char(str);
 
-	aux+=pos; // avanzamos el puntero tantas veces como le indique
-	i=j=0;    // el numero de posiciones.
+	aux += pos;
+	i = j = 0;
 
-	while(i<=strlen(aux))
-	{
-		arg = realloc(arg,sizeof(char *)*(a)); //modificamos el tamano del array de punteros a char.
+	while (i <= strlen(aux)) {
+		arg = realloc(arg, sizeof(char *)*(a));
 		
-		if(aux[i]==' ' || aux[i]=='\0')
-		{
-			
-			if (j==0)
-				l=i-j;
-			else
-				l=(i-1)-j;
+		if (aux[i] == WHITESPACE_CHAR || aux[i] == EOS_CHAR) {
+			if (j == 0) {
+				l = i - j;
+			} else {
+				l = (i - 1) - j;
+			}
 
-			arg[k]=malloc(sizeof(char)*l); //reservamos la memoria donde guardaremos la cadena k.
-			
-			if(arg[k]==NULL)
-				printf("Fallo critico: Memoria insuficiente\n\n");
-			
+			arg[k] = malloc(sizeof(char)*l);
 
-			strncpy(arg[k],aux,sizeof(char)*l);
+			if (arg[k] == NULL) {
+				printf("Critial error. Out of memory.\n\n");
+				return arg;
+			}
+
+			strncpy(arg[k], aux, sizeof(char)*l);
 			
-			z=0;
-			for(n=j;n<i;n++)
-			{
+			z = 0;
+			for (n=j;n<i;n++) {
 				arg[k][z]=aux[n];
 				z=z+1;
 			}
-			arg[k][z]='\0';
+
+			arg[k][z] = EOS_CHAR;
 
 			i++;
 	
-			while(aux[i]==' ') //subrutina que busca los espacios entre 2 palabras.
+			// Skiping white characters between words
+			while (aux[i] == WHITESPACE_CHAR) {
 				i++;
-			
+			}
 
-			j=i;
-
+			j = i;
 			k++;
 			a++;
 		
-		}
-		else
+		} else {
 			i++;
+		}
 	}
 
-	/*Tratamiento final:
-	  Nos aseguramos de que en la ultima posicion tengamos un puntero
-          a null, como se nos exige para el desarrollo de la practica.*/
-	
 	arg = realloc(arg,sizeof(char *)*(a+1));
-	arg[k]=NULL;
+	arg[k] = NULL;
+	free(aux);
 
 	return arg;
+}*/
+
+char** str_tokenizer(char* str)
+{
+	const char* auxStr = NULL;
+	char** tokens = NULL;
+	char* token = NULL;
+	int items = 0;
+	int pos = 0;
+
+	pos = find_first_char(str);
+
+	auxStr = str + pos;
+	printf("> line: %s\n", str);
+	printf("> first character found at position: %d\n", pos);
+	token = strtok(auxStr, WHITESPACE_CHAR);
 	
+	while (token != NULL) {
+		printf("> token found: %s\n", token);
+		items++;
+		tokens = (char**)realloc(tokens, sizeof(char*)*items);
+		save_token(tokens, token, items-1);
+		token = strtok(NULL, WHITESPACE_CHAR);
+	}
+	save_token(tokens, NULL, items);
+	print_tokens(tokens);
+	return tokens;
 }
 
-/*Esta funcion busca el inicio de la primera letra de la cadena
-  con esto conseguimos quitarnos los espacios que tenemos antes
-  de la aparición de la primera letra.
-
-  La función devuelte el indice donde se encuentra la primera letra
-  o FALSE (0) en caso de que no la encuentre, en cuyo caso indicará
-  que se le ha pasado un string vacio (pero con espacios)*/
-
-int buscar_inicio_cad(const char * str) 
+static int save_token(char** tokens, const char* token, int position)
 {
-	int i=0;
+	int length;
+	
+	if (position < 0 || tokens == NULL) {
+		return FAIL;
+	}
+	
+	if (token == NULL) {
+		tokens[position] = NULL;
+	} else {
+		length = strlen(token);
+		tokens[position] = (char*)malloc(sizeof(char)*length);
+		strncpy(tokens[position], token, length);
+	}
 
-	while(str[i] == ' ')
-		i++;
-
-	if(i==strlen(str))
-		return FALSE;
-	else
-		return i;
+	return SUCCESS;
 }
 
-/*A esta función se le pasa el doble puntero a char
-  y va liberando la memoria. Por pasos, primero 
-  libera la memoria apuntada por cada posicion de
-  de la tabla y luego libera el puntero que apunta a la tabla.*/
-
-void borrarg(char ** cadena)
+static void print_tokens(char** tokens)
 {
-	int i=0;
-	while(!cadena[i])
-		free(cadena[i]);
-	free(cadena);
+	int pos = 0;
+
+	while (tokens[pos] != NULL) {
+		printf("[%d] > %s\n", pos, tokens[pos]);
+		pos++;
+	}
+}
+
+static int find_first_char(const char* str) 
+{
+	int i;
+
+	for (i = 0; i < strlen(str); i++) {
+		if (str[i] != ' ') {
+			return i;
+		}
+	}
+
+	return FALSE;
+}
+
+void free_tokens(char** strings)
+{
+	int i = 0;
+
+	while (!strings[i]) {
+		free(strings[i]);
+	}
+
+	free(strings);
 } 
