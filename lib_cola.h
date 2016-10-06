@@ -1,4 +1,27 @@
-process * next(proc_queue proc);
-void queue(proc_queue proc, process* elem);
-void move(proc_queue proc);
-int is_null(proc_queue proc);
+#ifndef _LIB_COLA_H_
+#define _LIB_COLA_H_
+
+struct queue_entry_ {
+	void* data;
+	struct queue_entry_* next;
+};
+
+typedef struct queue_entry_ entry;
+
+struct queue_ {
+	int size;
+	entry* first;
+	entry* last;
+};
+
+typedef struct queue_ proc_queue;
+
+proc_queue* queue_new(void);
+void* queue_next(proc_queue* proc);
+void queue_add(proc_queue* proc, void* elem);
+void queue_move(proc_queue* proc);
+void queue_remove(proc_queue* proc);
+int is_queue_empty(proc_queue* proc);
+int queue_size(proc_queue* proc);
+void queue_free(proc_queue** queue,void (*free_data_cb)(void*));
+#endif

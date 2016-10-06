@@ -1,6 +1,7 @@
-
 #ifndef _LIB_FICHERO_H_
 #define _LIB_FICHERO_H_
+
+#include "lib_cola.h"
 
 #define LIMSTR 2
 #define LIPRST 1
@@ -22,11 +23,8 @@ struct process_ {
 };
 
 typedef struct process_ process;
-typedef process** proc_queue;
 
-
-process** load_from_file(const char* filename);
-int num_tasks(const proc_queue proc);
+proc_queue* load_from_file(const char* filename);
 char* save_to_file();
-void free_processes(proc_queue proc);
+void free_process_data(void* proc);
 #endif /*_LIB_FICHERO_H_*/

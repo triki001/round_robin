@@ -7,6 +7,7 @@
 #define TRUE 1
 #define FALSE 0
 
+static char* copy_line(const char* raw_file,int size);
 static void save_into_struct(process* procStr,char** str);
 static char* extract_from_file(const char* filename,int* lin);
 
@@ -42,84 +43,92 @@ Esta funcion tiene varias partes:
 */
 
 
-/*
-Esta funcion para la constante 1
-*/
 
-process** load_from_file(const char* filename)
+proc_queue* load_from_file(const char* filename)
 {
-	char* aux = NULL;
-	char* str = NULL;
-	char** strM = NULL;
-	process ** proc = NULL;
+	char* raw_file = NULL;
+	char* line = NULL;
+	char** splited_line = NULL;
+	process* proc_data = NULL;
+	proc_queue* proc = NULL;
 	int i = 0,j;
 	int lines;
 	
-	aux = extract_from_file(filename, &lines);
+	raw_file = extract_from_file(filename, &lines);
 
-	if (aux == NULL) {
+	if (raw_file == NULL) {
 		return NULL;
 	}
 
-	proc = realloc(proc, sizeof(process *)*(lines+1));
+	proc = queue_new();
 
 	if(proc == NULL) {
 		return NULL;
 	}
 
 	j = 0;
-	while (aux[i] != '\0') {		
-		if (aux[i] == '\n') {
-			proc[j] = malloc(sizeof(process));
+	while (raw_file[i] != '\0') {		
+		if (raw_file[i] == '\n') {
+			proc_data = malloc(sizeof(process));
 
-			if (proc[j] == NULL) {
+			if (proc_data == NULL) {
 				return NULL;
 			}
 
-			str = malloc(sizeof(char)*(i+1));
-			strncpy(str, aux, i);
-			str[i] = '\0';
-			
-			strM = str_tokenizer(str);
-			proc[j]->arg = malloc(sizeof(char *));
+			line = copy_line(raw_file, i);
+			splited_line = str_tokenizer(line);
+			free(line);
 
-			save_into_struct(proc[j], strM);
+			proc_data->arg = (char**)malloc(sizeof(char*));
 
-			free(str);
+			save_into_struct(proc_data, splited_line);
 
-			aux += i + 1;
+			free(line);
+			queue_add(proc, proc_data);
+			raw_file += i + 1;
 			i = 0;
 			j++;
 		} else {
 			i++;
 		}
 	}
-	
-	proc[lines] = NULL;
 
 	return proc;
 }
 
-int num_tasks(const proc_queue proc)
+static char* copy_line(const char* raw_file,int size)
 {
-	int i = 0;
-	process** aux = (process**)proc;
+	char* line = NULL;
 
-	while (aux[i] != NULL) {
-		i++;
+	if (raw_file == NULL) {
+		return NULL;
 	}
-	return i;
+
+	line = malloc(sizeof(char)*(size+1));
+	
+	if (line == NULL) {
+		return NULL;
+	}
+
+	strncpy(line, raw_file, size);
+	line[size] = '\0';
+
+	return line;
 }
 
-void free_processes(proc_queue proc)
+void free_process_data(void* proc)
 {
 	int i = 0;
-	process** aux = (process**)proc;
+	process* aux = (process*)proc;
 
-	for (i = 0; aux[i] != NULL; i++) {
-		free(aux[i]);
+	while(aux->arg[i] != NULL) {
+		free(aux->arg[i]);
+		i++;
 	}
+
+	free(aux->arg);
 	free(aux);
+	aux = NULL;
 }
 
 /* 

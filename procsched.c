@@ -6,24 +6,23 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
-#include "lib_fichero.h"
-#include "lib_cola.h"
 #include <time.h>
 #include <fcntl.h>
+#include "lib_fichero.h"
+#include "lib_cola.h"
 
 #define TRUE 1
 #define FALSE 0
 
-void init_pid_array(int* pidList,int size);
-void update_queue(proc_queue pc,const int* pidList,int numProcesses);
 void child_finish_cb(int signal, siginfo_t* info, void* data);
 
 int main(int argc,char** argv)
 {
 	process* aux = NULL;
-	proc_queue proc = NULL;
-	int i,j;
-	int* pid_array=NULL;
+	proc_queue* proc = NULL;
+	int pending_tasks;
+	int pid;
+	int i;
 	int status;
 	char buf[2];
 	int fd;
@@ -61,19 +60,13 @@ int main(int argc,char** argv)
 		printf("Error. Unable to load the tasks defined in file\n");
 		exit(-2);
 	}
-
-	pid_array = malloc(sizeof(int)*num_tasks(proc));
-
-	init_pid_array(pid_array,num_tasks(proc));
 	
-	for(i = 0; i < num_tasks(proc); i++) {
-		aux = next(proc); //sacamos la tarea.
-		move(proc); //avanzamos la cola.
-		queue(proc,aux); //encolamos la tarea
+	for (i = 0; i < queue_size(proc); i++) {
+		aux = queue_next(proc); //sacamos la tarea.
 		/*De esta forma podremos iniciar la tarea y pararla. Una tarea para cada hijo.*/
-		pid_array[i] = fork();
+		pid = fork();
 		
-		if(pid_array[i]==0) {
+		if (pid == 0) {
 			signal(SIGSTOP,SIG_DFL); //programamos al hijo para que capture las señales de parada y continuar.
 			signal(SIGCONT,SIG_DFL);
 		  	raise(SIGSTOP); //hacemos dormir a todos los hijos hasta que todos estén cargados.
@@ -84,64 +77,51 @@ int main(int argc,char** argv)
 			close(fd);
 			execvp(aux->arg[0],aux->arg); //ejecutamos la tarea en cuestion
 			exit(0); //esta funcion, termina el proceso y envia una señal al padre (SIGCHLD) para decirle q ha terminado
+		} else {
+			aux->pid = pid;
+			queue_move(proc); //avanzamos la cola.
 		}
 	}
-	i = num_tasks(proc);
-	printf("\n%d Tareas cargadas :: %d Procesos lanzados \n",i,i);
+	pending_tasks = queue_size(proc);
+	printf("\n%d Tareas cargadas :: %d Procesos lanzados \n", pending_tasks, pending_tasks);
 	printf("Para continuar, pulse una tecla\n");
 	getchar();
 	
-	update_queue(proc, pid_array, num_tasks(proc));
+	//update_queue(proc, pid_array, num_tasks(proc));
 	printf("*************************************************************************************\n");
 	printf("* P = Pending *** PID = Process ID *** T = Time *** S = Status *** C = Command      *\n");
 	printf("*************************************************************************************\n");
 	printf("\n");
-	j = 0;
-	while (!is_null(proc)) {
+
+	while (!is_queue_empty(proc)) {
 		sigaction(SIGCHLD,&act,NULL); // preparamos al padre para capturar la señal y le decimos que accion debera realizar
 					      // cuando capture la señal. En este caso, la señal SIGCHLD (se envia cuando el hijo para o termina.
-		aux = next(proc); //sacamos de la pila.
-		move(proc); //avanzamos la pila.
+		aux = (process*)queue_next(proc); //sacamos de la pila.
+		queue_move(proc); //avanzamos la pila.
 
 		kill(aux->pid,SIGCONT); //enviamos la señal de continuar al hijo.
-		printf("P: %d :: PID: %d :: T: %d sg :: S: Executing :: C: %s %s \n",i,aux->pid,aux->time,aux->arg[0],aux->arg[1]);
+		printf("P: %d :: PID: %d :: T: %d sg :: S: Executing :: C: %s %s \n",pending_tasks, aux->pid, aux->time, aux->arg[0], aux->arg[1]);
 		
 		sleep(aux->time); //dormimos al padre tantos segundos como los leidos por el fichero.
 
 		kill(aux->pid,SIGSTOP); //enviamos la señal de parar al hijo.
-		printf("P: %d :: PID: %d :: T: %d sg :: E: Stopped :: C: %s %s \n\n",i,aux->pid,aux->time,aux->arg[0],aux->arg[1]);
+		printf("P: %d :: PID: %d :: T: %d sg :: E: Stopped :: C: %s %s \n\n",pending_tasks, aux->pid, aux->time, aux->arg[0], aux->arg[1]);
 		
 		waitpid(aux->pid,&status,WUNTRACED | WCONTINUED); // ahora hacemos que el padre espere a que terminen los hijos.
 								  // o bien, si los hijos no han terminado, que continue.
 		if (WIFEXITED(status)) {
 			printf("Process %d finished successfully.\n\n",aux->pid);
-			i--;
-			pid_array[j] = 0;
+			queue_remove(proc);
+			pending_tasks = queue_size(proc);
 		} else {
-			queue(proc,aux);
+			queue_move(proc);
  		}
-		j++;
 	}
 	printf("\nNo more pending processes. Finish.\n\n");
-	free(pid_array);
-	free_processes(proc);
+	queue_free(&proc, free_process_data);
 
 	return 0;
 	
-}
-
-void init_pid_array(int* pidList,int size)
-{
-	memset(pidList, 0, sizeof(int)*size);
-}
-
-void update_queue(proc_queue pc,const int* pids,int numProcesses)
-{
-	int i;
-
-	for(i = 0; i < numProcesses; i++) {
-		pc[i]->pid = pids[i];
-	}
 }
 
 /* 
