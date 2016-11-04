@@ -24,4 +24,5 @@ void queue_remove(proc_queue* proc);
 int is_queue_empty(proc_queue* proc);
 int queue_size(proc_queue* proc);
 void queue_free(proc_queue** queue,void (*free_data_cb)(void*));
+
 #endif
