@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "tokenizer.h"
-#include "load.h"
+#include "parser.h"
 
 #define TRUE 1
 #define FALSE 0

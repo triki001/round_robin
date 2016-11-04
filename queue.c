@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "lib_cola.h"
+#include "queue.h"
 
 #define TRUE 1
 #define FALSE 0

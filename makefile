@@ -3,19 +3,19 @@ CFLAGS=-Wall -g
 
 all: procsched
 
-libs: lib_fichero.o lib_cola.o fragmenta.o
+libs: parser.o queue.o tokenizer.o
 
-procsched: fragmenta.o lib_fichero.o procsched.c lib_cola.o
-	gcc $(CFLAGS) procsched.c -o procsched lib_fichero.o fragmenta.o lib_cola.o
+procsched: tokenizer.o parser.o procsched.c queue.o
+	gcc $(CFLAGS) procsched.c -o procsched parser.o tokenizer.o queue.o
 
-fragmenta.o: fragmenta.c
-	gcc $(CFLAGS) -c fragmenta.c
+tokenizer.o: tokenizer.c
+	gcc $(CFLAGS) -c tokenizer.c
 
-lib_fichero.o: lib_fichero.c
-	gcc $(CFLAGS) -c lib_fichero.c
+parser.o: parser.c
+	gcc $(CFLAGS) -c parser.c
 
-lib_cola.o: lib_cola.c
-	gcc $(CFLAGS) -c lib_cola.c
+queue.o: queue.c
+	gcc $(CFLAGS) -c queue.c
 
 clean:
 	rm *.o procsched 
