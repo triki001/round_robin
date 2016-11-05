@@ -1,5 +1,0 @@
-10 echo hola
-100 cp /media/hdb7/El.Ilusionista.avi /home/javier/Videos/
-200 cp /media/hdb7/kubuntu-7.10-desktop-amd64.iso /home/javier/Videos/
-10 rm /home/javier/Videos/kubuntu-7.10-desktop-amd64.iso
-10 rm /home/javier/Videos/El.Ilusionista.avi
