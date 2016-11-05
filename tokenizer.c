@@ -59,8 +59,9 @@ static int save_token(char** tokens, const char* token, int position)
 		tokens[position] = NULL;
 	} else {
 		length = strlen(token);
-		tokens[position] = (char*)malloc(sizeof(char)*length);
+		tokens[position] = (char*)malloc(sizeof(char)*length+1);
 		strncpy(tokens[position], token, length);
+		tokens[position][length] = '\0';
 	}
 
 	return SUCCESS;
