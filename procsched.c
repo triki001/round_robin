@@ -8,8 +8,8 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <fcntl.h>
-#include "lib_fichero.h"
-#include "lib_cola.h"
+#include "parser.h"
+#include "queue.h"
 
 #define TRUE 1
 #define FALSE 0
@@ -24,20 +24,10 @@ int main(int argc,char** argv)
 	int pid;
 	int i;
 	int status;
-	char buf[2];
+	char buf[20];
 	int fd;
 	struct sigaction act;
-	
-	/*
-		Preparamos la estructura que manejara sigaction cuando reciba la señal.
-		Cuando reciba la señal, la funcion sigaction ejecutara la funcion definida
-		en el campo sa_sigaction. La funcion hay que definirla mas adelante como si fuera
-		una funcion normal. En los flags especificamos que use sig_action y no sig_hander y
-		que además, omitiremos la señal SIGCHLD cuando el hijo la emita al parar el proceso.
-		De esta forma nos aseguraremos de que solo ejecutara la accion cuando la señal SIGCHLD
-		sea recibida al terminar el proceso hijo.
-	*/
-	
+
 	act.sa_sigaction = child_finish_cb;
 	act.sa_flags=SA_NOCLDSTOP | SA_SIGINFO;
 
@@ -60,55 +50,56 @@ int main(int argc,char** argv)
 		printf("Error. Unable to load the tasks defined in file\n");
 		exit(-2);
 	}
-	
+
 	for (i = 0; i < queue_size(proc); i++) {
 		aux = queue_next(proc); //sacamos la tarea.
 		/*De esta forma podremos iniciar la tarea y pararla. Una tarea para cada hijo.*/
 		pid = fork();
-		
+
 		if (pid == 0) {
-			signal(SIGSTOP,SIG_DFL); //programamos al hijo para que capture las señales de parada y continuar.
+			signal(SIGSTOP,SIG_DFL);
 			signal(SIGCONT,SIG_DFL);
-		  	raise(SIGSTOP); //hacemos dormir a todos los hijos hasta que todos estén cargados.
-			sprintf(buf,"%d",i);
-			fd=open(buf,O_WRONLY|O_CREAT|O_TRUNC,S_IRWXU);//convierte la ruta(arg) en descriptor de fichero
-			//con los flags definidos y el modo especificado.man open
+		  	raise(SIGSTOP);
+
+			sprintf(buf,"process_%d",i);
+			fd=open(buf,O_WRONLY|O_CREAT|O_TRUNC,S_IRWXU);
+			
 			dup2(fd,STDOUT_FILENO);
 			close(fd);
-			execvp(aux->arg[0],aux->arg); //ejecutamos la tarea en cuestion
-			exit(0); //esta funcion, termina el proceso y envia una señal al padre (SIGCHLD) para decirle q ha terminado
+
+			execvp(aux->arg[0],aux->arg);
+			printf("launching process > %s ## %s %s\n", aux->arg[0], aux->arg[0], aux->arg[1]);
+			exit(0);
 		} else {
 			aux->pid = pid;
-			queue_move(proc); //avanzamos la cola.
+			queue_move(proc);
 		}
 	}
 	pending_tasks = queue_size(proc);
-	printf("\n%d Tareas cargadas :: %d Procesos lanzados \n", pending_tasks, pending_tasks);
-	printf("Para continuar, pulse una tecla\n");
+	printf("\n%d Tasks Loaded :: %d Process running\n", pending_tasks, pending_tasks);
+	printf("> Press any key to continue <\n");
 	getchar();
-	
-	//update_queue(proc, pid_array, num_tasks(proc));
+
 	printf("*************************************************************************************\n");
 	printf("* P = Pending *** PID = Process ID *** T = Time *** S = Status *** C = Command      *\n");
 	printf("*************************************************************************************\n");
 	printf("\n");
 
 	while (!is_queue_empty(proc)) {
-		sigaction(SIGCHLD,&act,NULL); // preparamos al padre para capturar la señal y le decimos que accion debera realizar
-					      // cuando capture la señal. En este caso, la señal SIGCHLD (se envia cuando el hijo para o termina.
-		aux = (process*)queue_next(proc); //sacamos de la pila.
-		queue_move(proc); //avanzamos la pila.
+		sigaction(SIGCHLD,&act,NULL);
+		aux = (process*)queue_next(proc);
+		queue_move(proc);
 
-		kill(aux->pid,SIGCONT); //enviamos la señal de continuar al hijo.
+		kill(aux->pid,SIGCONT);
 		printf("P: %d :: PID: %d :: T: %d sg :: S: Executing :: C: %s %s \n",pending_tasks, aux->pid, aux->time, aux->arg[0], aux->arg[1]);
-		
-		sleep(aux->time); //dormimos al padre tantos segundos como los leidos por el fichero.
 
-		kill(aux->pid,SIGSTOP); //enviamos la señal de parar al hijo.
+		sleep(aux->time);
+
+		kill(aux->pid,SIGSTOP);
 		printf("P: %d :: PID: %d :: T: %d sg :: E: Stopped :: C: %s %s \n\n",pending_tasks, aux->pid, aux->time, aux->arg[0], aux->arg[1]);
-		
-		waitpid(aux->pid,&status,WUNTRACED | WCONTINUED); // ahora hacemos que el padre espere a que terminen los hijos.
-								  // o bien, si los hijos no han terminado, que continue.
+
+		waitpid(aux->pid,&status,WUNTRACED | WCONTINUED);
+
 		if (WIFEXITED(status)) {
 			printf("Process %d finished successfully.\n\n",aux->pid);
 			queue_remove(proc);
@@ -124,13 +115,6 @@ int main(int argc,char** argv)
 	
 }
 
-/* 
-Cuando capturemos la señal SIGCHLD, el programa ejecutara la funcion
-hijo_terminado() que en esencia lo que hace es decir al padre que continue
-pues esta dormido. de esta forma, nos aseguramos que si un proceso tiene un
-tiempo de 10 segundos, pero termina en el segundo 2, el padre no se quede dormido
-los 8 segundos restantes.
-*/
 void child_finish_cb(int signal, siginfo_t* info, void* data)
 {
 	raise(SIGCONT); //enviamos la señal al padre.
